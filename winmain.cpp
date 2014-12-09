@@ -1,8 +1,5 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-
-#define MSG(m) {MessageBoxA(NULL,m,NULL,MB_OK);}
-
 //関数プロトタイプ
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int);
 bool CreateMainWindow(HINSTANCE, int);
@@ -21,8 +18,6 @@ const char CLASS_NAME[] = "keyboard";
 const char APP_TITLE[] = "KeysDown";
 const int WINDOW_WIDTH = 400;
 const int WINDOW_HEIGHT = 400;
-
-#define CHILD_ID 1
 
 
 //=============================================================
@@ -44,7 +39,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	if(!CreateMainWindow(hInstance, nCmdShow))
 		return false;
 
-
 	int done = 0;
 	while (!done)
 	{
@@ -64,23 +58,119 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 //=====================================================
 LRESULT WINAPI WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 
+	short nVirtKey;                 //仮想キーコード 
+    const short SHIFTED = (short)0x8000; 
+    DWORD chWidth = 20;             // width of characters
+    DWORD chHeight = 20;            // height of characters
+
+
 	switch(msg){
+	case WM_CHAR:				//キーボードから文字が入力された場合
+		switch(wParam)			//wParamに文字が格納されている
+		{
+		case 0x08:				//バックスペース
+		case 0x09:				//タブ
+		case 0x0A:				//ラインフィード
+		case 0x0D:				//キャリッジリターン
+		case 0x1B:				//エスケープ
+			MessageBeep((UINT)-1);	//ビープ音を鳴らす、表示はしない
+			return 0;
+		default:				//表示可能な文字
+			ch = (TCHAR)wParam;			//文字を取得
+			//WM_PAINTを強制的に発生させる
+			InvalidateRect(hwnd, NULL, TRUE);
+			return 0;
+
+		}
+	
+	case WM_KEYDOWN:					//キーが押された場合
+		vkKeys[wParam] = true;
+		switch(wParam)
+		{
+		case VK_SHIFT:					//Shiftキー
+			nVirtKey = GetKeyState(VK_LSHIFT);	//左シフトキーの状態を取得
+			if(nVirtKey & SHIFTED)				//左シフトキーの場合
+				vkKeys[VK_LSHIFT] = true;
+			nVirtKey = GetKeyState(VK_RSHIFT);	//右シフトキーの状態を取得
+			if(nVirtKey & SHIFTED)				//右シフトキーの場合
+				vkKeys[VK_RSHIFT] = true;
+			break;
+
+		case VK_CONTROL:				//CTRキー
+			nVirtKey = GetKeyState(VK_LCONTROL);//左CTRLキーの場合
+			if(nVirtKey & SHIFTED)				//左CTRLーの場合
+				vkKeys[VK_LCONTROL] = true;
+			nVirtKey = GetKeyState(VK_RCONTROL);//右のCTRLキーの場合
+			if(nVirtKey & SHIFTED)				//右CTRLキーの場合
+				vkKeys[VK_RSHIFT] = true;
+			break;
+		}
+		InvalidateRect(hwnd, NULL, TRUE);		//WM_PAINTを強制的に発生させる
+		return 0;
+		break;
+
+	case WM_KEYUP:								//キーが離された場合
+		vkKeys[wParam] = false;
+		switch(wParam)
+		{
+		case VK_SHIFT:					//Shiftキー
+			nVirtKey = GetKeyState(VK_LSHIFT);	//左シフトキーの状態を取得
+			if((nVirtKey & SHIFTED) == 0)				//左シフトキーの場合
+				vkKeys[VK_LSHIFT] = false;
+			nVirtKey = GetKeyState(VK_RSHIFT);	//右シフトキーの状態を取得
+			if((nVirtKey & SHIFTED) == 0)				//右シフトキーの場合
+				vkKeys[VK_RSHIFT] = false;
+			break;
+
+		case VK_CONTROL:				//CTRキー
+			nVirtKey = GetKeyState(VK_LCONTROL);//左CTRLキーの場合
+			if((nVirtKey & SHIFTED) == 0)				//左CTRLーの場合
+				vkKeys[VK_LCONTROL] = false;
+			nVirtKey = GetKeyState(VK_RCONTROL);//右のCTRLキーの場合
+			if((nVirtKey & SHIFTED) == 0)				//右CTRLキーの場合
+				vkKeys[VK_RSHIFT] = false;
+			break;
+		}
+		InvalidateRect(hwnd, NULL, TRUE);		//WM_PAINTを強制的に発生させる
+		return 0;
+		break;
+
+		case WM_PAINT:	//ウィンドウを再描画する必要がある場合
+					//デバイスコンテキストへのハンドルを取得
+		hdc = BeginPaint(hwnd, &ps);
+		//GetClientRect(hwnd, &rect);			//ウィンドウの矩形を取得
+
+
+		//文字を表示
+		TextOut(hdc, 0, 0, &ch, 1);
+
+		for (int r=0; r<16; r++)
+            {
+                for (int c=0; c<16; c++)
+                {
+                    if (vkKeys[r*16+c])
+                    {
+                        SetBkMode(hdc, OPAQUE);         // opaque text background
+                        TextOut(hdc,c*chWidth+chWidth*2,r*chHeight+chHeight*2,"T ", 2);
+                    } else {
+                        SetBkMode(hdc, TRANSPARENT);    // transparent text background
+                        TextOut(hdc,c*chWidth+chWidth*2,r*chHeight+chHeight*2,"F ", 2);
+                    }
+                }
+            }
+
+		EndPaint(hwnd, &ps);
+		return 0;
+	default:
+		return DefWindowProc(hwnd, msg, wParam, lParam);
+
+
+
 	case WM_DESTROY:
 		//Windowsにこのプログラムを終了するように伝える
 		PostQuitMessage(0);
 		return 0;
-
-	case WM_COMMAND:
-        switch(wParam)
-		{
-                //さっきのボタンの子ウィンドウIDなら
-            case CHILD_ID:
-                MessageBoxA(NULL,"ボタンが押されました","メッセージ発生",MB_OK);
-                return 0;
-        }
-        break;
 	}
-
 	return DefWindowProc(hwnd, msg, wParam, lParam);
 }
 
@@ -92,7 +182,6 @@ bool CreateMainWindow(HINSTANCE hInstance, int nCmdShow)
 {
 	WNDCLASSEX wcx;
 	HWND hwnd;
-	HWND hwnd_button;
 	
 	//ウィンドウクラスの構造体をメインウィンドウを記述するパラメータで設定する。
 	wcx.cbSize = sizeof(wcx);						//構造体のサイズ
@@ -128,11 +217,8 @@ bool CreateMainWindow(HINSTANCE hInstance, int nCmdShow)
 		hInstance,					//アプリケーションインスタンスへのハンドル
 		NULL);				//ウィンドウパラメータなし
 
-	hwnd_button=CreateWindow("button","ボタン",WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON, 50,50,100,100,hwnd,(HMENU)CHILD_ID,hInstance,NULL);
-
-
 	//ウィンドウの作成でエラー発生した場合
-	if(!hwnd || !hwnd_button)
+	if(!hwnd)
 		return false;
 
 	//ウィンドウを表示
